@@ -1,4 +1,4 @@
-# Mini spice engine
+# MicroSpice
 
 This is a small spice parser and engine written in python that runs AC, DC and transient simulations for linear elements. 
 
