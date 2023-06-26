@@ -34,7 +34,7 @@ The project was first implemented in MATLAB as part of the *"CAD for high speed 
   - [ ] Add support for nonlinear elements
 - Code improvements
   - [ ] Redesign toplevel interface
-  - [ ] Use native python exceptions for error handling
+  - [x] Use native python exceptions for error handling
   - [ ] Make error handling more expansive
   - [ ] Logging
 - Feature additions

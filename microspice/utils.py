@@ -20,6 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import microspice.errors as errors
+
 import re
 import math
 
@@ -39,10 +41,12 @@ def parse_number(str_inp):
         if unit:
             value = apply_unit(value, unit)
         
+        if(math.isnan(value)):
+            raise errors.SyntaxError(f"Invalid numeric value {str}")
+        
         return value
     else:
-        print("empty")
-        return math.nan
+        raise errors.uSpiceBug("parse_number received an empty input")
 
 def get_scaling(prefix):
     scaling_dict = {
@@ -106,4 +110,4 @@ def apply_unit(value, unit):
         else:
             return value * conversion
     else:
-        return math.nan
+        raise errors.SyntaxError(f"Invalid unit, '{unit}'")

@@ -21,7 +21,8 @@
 # SOFTWARE.
 
 import microspice.parser        as parser
-import microspice.error.error   as error
+import microspice.errors        as errors
+
 import matplotlib.pyplot        as plt
 
 class Microspice():
@@ -30,22 +31,19 @@ class Microspice():
         self.run_num    = 0        
 
     def parse_file(self, file_name):
-        ret = self.parser.read(file_name)
-        if(ret.level()):
-            print(ret.to_str())
-            return ret
+        self.parser.read(file_name)
         
-        ret = self.parser.parse()
-        if(ret.level()):
-            print(ret.to_str())
-            return ret
-        
+        self.parser.parse()
         self.run_num    = 0        
-        return ret
-    
-    def parse_and_run_file(self, file_name):
-        self.parse_file(file_name)
         
+    def parse_and_run_file(self, file_name):
+        try:
+            self.parse_file(file_name)
+        except errors.NetlistError as e:
+            print("Error encountered while parsing!!")
+            print(e)
+            return
+
         while(not self.done()):
             self.run_next()
             self.disp_result()
@@ -57,13 +55,11 @@ class Microspice():
 
     def run_next(self):
         if(self.done()):
-            return error.GenError("Simulated all environments")
+            return errors.uSpiceError("No more configurations to run") .GenError("Simulated all environments")
         
         self.parser.eng.set_env(self.parser.envs[self.run_num])
         self.result     = self.parser.eng.run()
         self.run_num   += 1
-
-        return error.OkError()
 
     def disp_result(self):
         plt.title(f'Transient simulation result {self.run_num}')

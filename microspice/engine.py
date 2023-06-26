@@ -22,7 +22,6 @@
 
 import numpy as np
 import re
-from collections import defaultdict
 
 class Engine:
     def __init__(self):
@@ -91,9 +90,6 @@ class Engine:
         mat = self.env.get_mat_dc()
         lhs_mat = mat[:, :-1]
         rhs_vec = mat[:,-1]
-
-        print(lhs_mat)
-        print(rhs_vec)
 
         soln_vec = np.linalg.solve(lhs_mat, rhs_vec)
         return soln_vec

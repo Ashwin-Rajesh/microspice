@@ -22,7 +22,6 @@
 
 import copy
 import numpy as np
-from collections import defaultdict
 
 class Environment:
     def __init__(self):

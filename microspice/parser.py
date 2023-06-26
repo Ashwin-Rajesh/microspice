@@ -21,7 +21,8 @@
 # SOFTWARE.
 
 import microspice.engine        as engine
-import microspice.error.error   as error
+# import microspice.error.error   as error
+import microspice.errors        as errors
 import microspice.environment   as environment
 import microspice.elements      as elements
 from   microspice.utils         import *
@@ -42,13 +43,10 @@ class Parser:
 
     # Read a netlist into buffer and initialize variables
     def read(self, inp_file):
-        ret = error.OkError()
-
         # Check if the file exists
         if not os.path.isfile(inp_file):
-            ret = error.GenError("File " + inp_file + " does not exist")
-            return ret
-
+            raise errors.uSpiceError(f"File {inp_file} could not be opened")
+            
         # Set the filename and line counts (used for debugging)
         self.file_name = inp_file
         self.next_line = 1
@@ -63,97 +61,78 @@ class Parser:
         with open(self.file_name, 'r') as file:
             self.file_lines = file.read().split('\n')
         
-        return ret
-
     # Parse the whole netlist
     def parse(self):
         max_lines = len(self.file_lines)
 
         # Iterate through all the lines
         while self.next_line <= max_lines:
-            ret = self.parse_line()
-            if ret.level():
-                return ret
+            self.parse_line()
             
-        return ret
-
     # Parse a single line of the spice netlist
     def parse_line(self):
-        ret = error.OkError()
-
         # Last line (should not happen unless function is called after running "parse()")
         if len(self.file_lines) < self.next_line:
-            ret = error.GenError("File read completely")
-            return ret
-
+            raise errors.uSpiceError("File read completely")
+            
         # Read file, remove comments and leading and trailing whitespace
         line = self.file_lines[self.next_line - 1].split('*')[0].strip()
         if len(line) == 0:
             self.next_line += 1
-            return ret
-
+            return
+        
         # Decide the element type or the command 
         switch_case = line[0].lower()
         # Comment
         if switch_case == '*':
-            self.next_line += 1
-            return ret
+            pass
         # Command
         elif switch_case == '.':
-            ret = self.parse_command(line)
-            self.next_line += 1
-            return ret
-        # Capacitor
-        elif switch_case == 'c':
-            e = elements.Capacitor()
-            ret = e.read_spice([self.file_name, self.next_line, line])
-        # Resistor
-        elif switch_case == 'r':
-            e = elements.Resistor()
-            ret = e.read_spice([self.file_name, self.next_line, line])
-        # Voltage source
-        elif switch_case == 'v':
-            pattern = r'^(?P<id>\w+)\s+(?P<n1>\w+)\s+(?P<n2>\w+)\s+(?P<type>\w+)(\s+)?\(.+\)$'
-            match = re.match(pattern, line)
-
-            if match is None:
-                e = elements.VConst()
-                ret = e.read_spice([self.file_name, self.next_line, line])
-            else:
-                voltage_type = match.group('type').lower()
-                if voltage_type == "pulse":
-                    e = elements.VPulse()
-                    ret = e.read_spice([self.file_name, self.next_line, line])
-                elif voltage_type == "pwl":
-                    e = elements.VPWL()
-                    ret = e.read_spice([self.file_name, self.next_line, line])
-                elif voltage_type == "sin":
-                    e = elements.VSin()
-                    ret = e.read_spice([self.file_name, self.next_line, line])
-                else:
-                    ret = error.InpError(self.file_name, self.next_line,
-                                         "Unidentified voltage source type " + voltage_type)
-        # VCCS (Voltage controlled current source)
-        elif switch_case == 'g':
-            e = elements.VCCS()
-            ret = e.read_spice([self.file_name, self.next_line, line])
-        # Not implemented!
+            self.parse_command(line)
         else:
-            ret = error.InpError(self.file_name, self.next_line, "Unidentified prefix")
-            self.next_line += 1
-            return ret
+            # Add elements
+            # Capacitor
+            if switch_case == 'c':
+                e = elements.Capacitor()
+            # Resistor
+            elif switch_case == 'r':
+                e = elements.Resistor()
+            # Voltage source
+            elif switch_case == 'v':
+                pattern = r'^(?P<id>\w+)\s+(?P<n1>\w+)\s+(?P<n2>\w+)\s+(?P<type>\w+)(\s+)?\(.+\)$'
+                match = re.match(pattern, line)
 
-        # Error detection
-        if not ret.level():
+                if match is None:
+                    e = elements.VConst()
+                else:
+                    voltage_type = match.group('type').lower()
+                    if voltage_type == "pulse":
+                        e = elements.VPulse()
+                    elif voltage_type == "pwl":
+                        e = elements.VPWL()
+                    elif voltage_type == "sin":
+                        e = elements.VSin()
+                    else:
+                        raise errors.NetlistError(self.file_name, self.next_line, f"Unidentified voltage source type {voltage_type}")
+
+            # VCCS (Voltage controlled current source)
+            elif switch_case == 'g':
+                e = elements.VCCS()
+            # Not implemented!
+            else:
+                raise errors.NetlistError(self.file_name, self.next_line, "Unidetified prefix")
+            
+            try:
+                e.read_spice(line)
+            except errors.SyntaxError as e:
+                raise errors.NetlistError(self.file_name, self.next_line, e.message + '\n' + line)
+            
             self.envs[-1].add_component(e)
-            self.next_line += 1
-
-        return ret
+        
+        self.next_line += 1
 
     # Parse a spice command (starts with .)
     def parse_command(self, line):
-        ret = error.OkError()
-
         # Extract the components of the command (separated by spaces)
         cmd_parts = line[1:].split(' ')
         cmd_parts = [part for part in cmd_parts if part != ""]
@@ -182,5 +161,3 @@ class Parser:
         elif switch_case == "alter":
             # The alter command sets up one more simulation by creating a copy of the most recent environment
             self.envs.append(copy.deepcopy(self.envs[-1]))
-
-        return ret
